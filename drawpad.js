@@ -19,16 +19,10 @@
 	window.saveE = historyEvent;
 	
 	$(document).ready(function (){
-		pad.init($("#drawpad"),$("#drawpadup"));
-		
-		$(document).mousemove(mouseEvent.move);
-		$(window).mousedown(mouseEvent.down);
-		$(window).mouseup(mouseEvent.up);
+		pad.init($("#drawpad-layers"),$("#drawpadup"));
 		
 		$(document).keypress(callKeyFunction);
 		$(".replay").click(history.replay);
-		pad.layer.clear();
-		pad.write.clear();
 		
 		startPadListener();
 	});
@@ -53,7 +47,6 @@
 		}
 	}
 	
-		
 	tempFunc = {
 		clearCanvas: function(){
 			this.context.clearRect(0, 0, settings.CANVAS_WIDTH, settings.CANVAS_HEIGHT);
@@ -69,56 +62,90 @@
 				element: false,
 				context: false,
 				clear: tempFunc.clearCanvas,
-				setIndex: tempFunc.setIndex
+				setIndex: tempFunc.setIndex,
+				init: tempFunc.layerInit
 			}
+		},
+		layerInit: function(jque){
+			this.$ = jque;
+			this.element = jque[0];
+			this.context = jque[0].getContext('2d');
 		}
 	}
 		
 	var pad = {
-		write: tempFunc.layer('write'),
-		layerCount: 0,
 		lay: function(i){
 			if(i == undefined) i = style.layer;
-			return pad.layer.data[i];
+			return this.layer.data[i];
+		},
+		write: function(){
+			return this.layer.write;
 		},
 		layer: {
-			create: function(){
-				this.data.push(tempFunc.layer(layerCount++));
+			write: tempFunc.layer('write'),
+			root: false,
+			layerCount: 0,
+			create: function(e){
+				id = this.layerCount++;
+				layer = tempFunc.layer(id);
+				canvas = $("<canvas></canvas>").attr({
+					'id': 'drawpad_' + id,
+					'width': settings.CANVAS_WIDTH,
+					'height': settings.CANVAS_HEIGHT
+				}).addClass('drawpad').css('z-index', 10 + id);
+				this.root.append(canvas);
+				layer.init(canvas);
+				
+				if(e === undefined)
+					modes[modes.defineMode.CreateLayer].eventSave();
+				this.data.push(layer);
 			},
 			remove: function(i){
 				this.data[i].$.remove();
 				this.data.splice(i, 1);
 			},
+			removeAll: function(i){
+				$.each(this.data, function(i, o){
+					o.$.remove();
+				});
+				this.data = [];
+				this.layerCount = 0;
+			},
 			change: function(i){
 				style.layer = i;
+				this.write.css('z-index', 10 + i);
 			},
 			clear: function(){
-				$.each(pad.layer.data, function(i, o){
+				$.each(this.data, function(i, o){
 					o.clear();
 				});
 			},
-			data: [
-				tempFunc.layer(layerCount++)
-			]
+			data: []
 		},
 		setStyle: function(colorRGBAInt, width, alpha){
-			rgba = this.RGBA.getCSSFromInt(colorRGBAInt);
+			rgba = this.RGBA.getRGBA(colorRGBAInt);
+			rgbaCSS = this.RGBA.getCSSFromInt(colorRGBAInt);
+
 			alpha = rgba.alpha / 255;
-			pad.write.context.strokeStyle = rgba;
-			pad.write.context.fillStyle = rgba;
-			pad.write.context.lineWidth = width;
-			pad.lay().context.globalAlpha = alpha;
+			this.write().context.strokeStyle = rgbaCSS;
+			this.write().context.fillStyle = rgbaCSS;
+			this.write().context.lineWidth = width;
+			this.lay().context.globalAlpha = alpha;
 			
-			pad.write.$.css('opacity', alpha);
+			this.write().$.css('opacity', alpha);
 		},
-		init: function(jqueDown, jqueUp){
-			pad.lay().$ = jqueDown;
-			pad.lay().element = jqueDown[0];
-			pad.lay().context = this.lay().element.getContext('2d');
+		init: function(jqueLayers, jqueWrite){
+			this.layer.root = jqueLayers;
+			this.layer.create();
 			
-			pad.write.$ = jqueUp;
-			pad.write.element = jqueUp[0];
-			pad.write.context = this.up.element.getContext('2d');
+			// set Event
+			$(document).mousemove(this.mouseEvent.move);
+			$(window).mousedown(this.mouseEvent.down);
+			$(window).mouseup(this.mouseEvent.up);
+
+			this.write().$ = jqueWrite;
+			this.write().element = jqueWrite[0];
+			this.write().context = this.write().element.getContext('2d');
 		},
 		RGBA: {
 			getInt: function(rgba){
@@ -164,7 +191,7 @@
 	};
 	
 	var	settings = pad.settings = {
-		TIME_DELAY: 10,
+		TIME_DELAY: 20,
 		CANVAS_WIDTH: 800,
 		CANVAS_HEIGHT: 480,
 		CANVAS_EVENTOFFSET: 100,
@@ -241,10 +268,10 @@
 				historyMinStep = historyPad.length - settings.HISTORY_LIMIT;
 			}
 			
-			img = pad.write.element.toDataURL();
+			img = pad.write().element.toDataURL();
 			imgO = new Image();
 			imgO.onload = function(){
-				pad.write.clear();
+				pad.write().clear();
 				pad.lay().context.drawImage(imgO, 0, 0);
 				historyPad.push({
 					layer: style.layer,
@@ -257,8 +284,8 @@
 		replay: function(){
 			if(history.data.replayState) return false;
 			history.data.replayState = true;
-			pad.layer.clear();
-			pad.write.clear();
+			pad.layer.removeAll();
+			pad.write().clear();
 			
 			timeIndex = 0;
 			eventIndex = 0;
@@ -299,23 +326,28 @@
 	};
 						
 	var modes = pad.modes = {
+		get: function(str){
+			if(this.defineMode[str]	=== undefined) return function(){};
+			return this[this.defineMode[str]];
+		},
 		defineMode: {
-			'line': 0
+			Line: 0,
+			CreateLayer: 1
 		},
 		0: {
-			name: "line",
+			name: "Line",
 			thisIndex: 0,
 			dataCheck: function(data){
 				return data[modes.define.drawType] === this.thisIndex;
 			},
 			play: function(data){
+				window.lastData = data;
 				d = modes.define;
 				if(!this.dataCheck(data)) return false;
 				if(data[d.axis].length < 2) return true;
 
 				pad.layer.change(data[d.layer]);				
 				pad.setStyle(data[d.color], data[d.width]);
-				window.lastData = data;
 					
 				iNow = 1;
 				dataLength = data[d.axis].length;
@@ -355,7 +387,7 @@
 				if(pad.position.compare(cStart, cNow)){
 					cNow.x++; cNow.y++;
 				}
-				context = pad.write.context;
+				context = pad.write().context;
 				context.beginPath();
 				context.lineJoin = 'round';
 				context.lineCap = 'round';
@@ -364,7 +396,7 @@
 				context.closePath();
 				context.stroke();
 			},
-			eventTrigger: function(e){
+			eventTrigger: function(){
 				// If click state change
 				if(lastMouseClickedState != mouseClicked){
 					if(mouseInner){
@@ -437,14 +469,14 @@
 				$("#value_msize").html((history.getMsgPackSize() / 1024).toFixed(2) + " KB");
 			},
 			eventSave: function(){
-				historyEvent.push({
-					modes.define.drawType: style.draw,
-					modes.define.width: style.width,
-					modes.define.color: style.color,
-					modes.define.time: historyAllStep - historyEventAxis.length,
-					modes.define.axis: historyEventAxis,
-					modes.define.layer: style.layer
-				});
+				data = {};
+				data[modes.define.drawType] = this.thisIndex;
+				data[modes.define.width]    = style.width;
+				data[modes.define.color]    = style.color;
+				data[modes.define.time]     = historyAllStep - historyEventAxis.length;
+				data[modes.define.axis]     = historyEventAxis;
+				data[modes.define.layer]    = style.layer;
+				historyEvent.push(data);
 			},
 			data: {
 				lastMouse: {x: 0, y: 0},
@@ -453,12 +485,24 @@
 			},
 		},
 		1: {
-			name: "createLayer",
+			name: "Create Layer",
 			thisIndex: 1,
+			dataCheck: function(data){
+				return data[modes.define.drawType] === this.thisIndex;
+			},
 			play: function(data){
-			
+				d = modes.define;
+				if(!this.dataCheck(data)) return false;
+				pad.layer.create(false);
+			},
+			eventTrigger: function(){},
+			eventSave: function(){
+				data = {};
+				data[modes.define.drawType] = this.thisIndex;
+				data[modes.define.time]     = historyAllStep,
+				historyEvent.push(data);
 			}
-		}
+		},
 		define: {
 			drawType: 0,
 			width: 1,
@@ -478,7 +522,7 @@
 			mouseClicked = false;
 		},
 		move: function (e){
-			off = pad.write.$.offset();
+			off = pad.write().$.offset();
 			
 			mouse.pos.x = e.pageX - off.left;
 			mouse.pos.y = e.pageY - off.top;

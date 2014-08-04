@@ -52,7 +52,7 @@
 	border-bottom: 1px solid #000;
 }
 
-#drawpad, #drawpadup, #cursor-overlay {
+.drawpad, #drawpadup, #cursor-overlay {
 	position: absolute;
 	top: 45px;
 	left: 0px;
@@ -97,7 +97,7 @@
 	<div id="bgzone"></div>
 
 	<div id="drawpad-layers"></div>
-	<canvas id="drawpadup" width="800" height="480"></canvas>
+	<canvas id="drawpadup" width="800" height="480" style="z-index: 100"></canvas>
 
 	<div id="cursor-overlay">
 		<canvas id="cursor-draw" width="854px" height="480px"></canvas>
