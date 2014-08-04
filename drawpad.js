@@ -64,6 +64,7 @@
 		layer: function(lid){
 			return {
 				id: lid,
+				name: 'Layer' + lid,
 				$: false,
 				element: false,
 				context: false,
@@ -78,15 +79,14 @@
 		layerCount: 0,
 		layer: {
 			create: function(){
-				this.layer.push(tempFunc.layer(layerCount++));
+				this.data.push(tempFunc.layer(layerCount++));
 			},
 			remove: function(i){
-				this.layer.splice();
+				this.data[i].$.remove();
+				this.data.splice(i, 1);
 			},
 			data: [
-				{
-					tempFunc.layer(layerCount++)
-				}
+				tempFunc.layer(layerCount++)
 			]
 		},
 		setStyle: function(colorRGBAInt, width, alpha){
@@ -226,7 +226,10 @@
 			imgO.onload = function(){
 				pad.up.clear();
 				pad.down.context.drawImage(imgO, 0, 0);
-				historyPad.push(pad.down.element.toDataURL());
+				historyPad.push({
+					layer: style.layer,
+					data: pad.down.element.toDataURL()
+				});
 			};
 			imgO.src = img;
 			
