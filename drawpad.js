@@ -27,8 +27,8 @@
 		
 		$(document).keypress(callKeyFunction);
 		$(".replay").click(history.replay);
-		pad.down.clear();
-		pad.up.clear();
+		pad.layer.clear();
+		pad.write.clear();
 		
 		startPadListener();
 	});
@@ -77,6 +77,10 @@
 	var pad = {
 		write: tempFunc.layer('write'),
 		layerCount: 0,
+		lay: function(i){
+			if(i == undefined) i = style.layer;
+			return pad.layer.data[i];
+		},
 		layer: {
 			create: function(){
 				this.data.push(tempFunc.layer(layerCount++));
@@ -85,26 +89,36 @@
 				this.data[i].$.remove();
 				this.data.splice(i, 1);
 			},
+			change: function(i){
+				style.layer = i;
+			},
+			clear: function(){
+				$.each(pad.layer.data, function(i, o){
+					o.clear();
+				});
+			},
 			data: [
 				tempFunc.layer(layerCount++)
 			]
 		},
 		setStyle: function(colorRGBAInt, width, alpha){
-			this.up.context.strokeStyle = this.RGBA.getCSSFromInt(colorRGBAInt);
-			this.up.context.fillStyle = this.RGBA.getCSSFromInt(colorRGBAInt);
-			this.down.context.globalAlpha = this.RGBA.getRGBA(colorRGBAInt).alpha / 255;
-			this.up.context.lineWidth = width;
+			rgba = this.RGBA.getCSSFromInt(colorRGBAInt);
+			alpha = rgba.alpha / 255;
+			pad.write.context.strokeStyle = rgba;
+			pad.write.context.fillStyle = rgba;
+			pad.write.context.lineWidth = width;
+			pad.lay().context.globalAlpha = alpha;
 			
-			this.up.$.css('opacity', this.RGBA.getRGBA(colorRGBAInt).alpha / 255);
+			pad.write.$.css('opacity', alpha);
 		},
 		init: function(jqueDown, jqueUp){
-			this.down.$ = jqueDown;
-			this.down.element = jqueDown[0];
-			this.down.context = this.down.element.getContext('2d');
+			pad.lay().$ = jqueDown;
+			pad.lay().element = jqueDown[0];
+			pad.lay().context = this.lay().element.getContext('2d');
 			
-			this.up.$ = jqueUp;
-			this.up.element = jqueUp[0];
-			this.up.context = this.up.element.getContext('2d');
+			pad.write.$ = jqueUp;
+			pad.write.element = jqueUp[0];
+			pad.write.context = this.up.element.getContext('2d');
 		},
 		RGBA: {
 			getInt: function(rgba){
@@ -175,21 +189,27 @@
 	/* key funciton */
 		undo: function (){
 			if(historyStep > 0 && (historyPad[historyStep - 2] != undefined || historyStep == 1)){
-				pad.down.clear();
+				historyObject = historyPad[--historyStep - 1];
+				pad.layout.change(historyObject.layer);
+
+				pad.lay().clear();
 				img = new Image();
-				img.src = historyPad[--historyStep - 1];
+				img.src = historyObject.data;
 				img.onload = function(){ 
-					pad.down.context.globalAlpha = 1;
-					pad.down.context.drawImage(img, 0, 0) 
+					pad.lay().context.globalAlpha = 1;
+					pad.lay().context.drawImage(img, 0, 0) 
 				};
 			}
 		},
 		redo: function (){
 			if(history.haveRedo()){
-				pad.down.clear();
+				historyObject = historyPad[historyStep++];
+				pad.layout.change(historyObject.layer);
+				
+				pad.lay().clear();
 				img = new Image();
-				img.src = historyPad[historyStep++];
-				img.onload = function(){ pad.down.context.drawImage(img, 0, 0) };
+				img.src = historyObject.data;
+				img.onload = function(){ pad.lay().context.drawImage(img, 0, 0) };
 			}
 		},
 		clearRedo: function(){
@@ -221,14 +241,14 @@
 				historyMinStep = historyPad.length - settings.HISTORY_LIMIT;
 			}
 			
-			img = pad.up.element.toDataURL();
+			img = pad.write.element.toDataURL();
 			imgO = new Image();
 			imgO.onload = function(){
-				pad.up.clear();
-				pad.down.context.drawImage(imgO, 0, 0);
+				pad.write.clear();
+				pad.lay().context.drawImage(imgO, 0, 0);
 				historyPad.push({
 					layer: style.layer,
-					data: pad.down.element.toDataURL()
+					data: pad.lay().element.toDataURL()
 				});
 			};
 			imgO.src = img;
@@ -237,8 +257,9 @@
 		replay: function(){
 			if(history.data.replayState) return false;
 			history.data.replayState = true;
-			pad.down.clear();
-			pad.up.clear();
+			pad.layer.clear();
+			pad.write.clear();
+			
 			timeIndex = 0;
 			eventIndex = 0;
 			endLength = historyEvent.length;
@@ -278,22 +299,21 @@
 	};
 						
 	var modes = pad.modes = {
-		defines: {
+		defineMode: {
 			'line': 0
 		},
 		0: {
 			name: "line",
 			thisIndex: 0,
 			dataCheck: function(data){
-				d = modes.define;
-				if(data[d.drawType] !== this.thisIndex) return false;
-				return true;
+				return data[modes.define.drawType] === this.thisIndex;
 			},
 			play: function(data){
 				d = modes.define;
 				if(!this.dataCheck(data)) return false;
 				if(data[d.axis].length < 2) return true;
-				
+
+				pad.layer.change(data[d.layer]);				
 				pad.setStyle(data[d.color], data[d.width]);
 				window.lastData = data;
 					
@@ -320,6 +340,7 @@
 				if(!this.dataCheck(data)) return false;
 				if(data[d.axis].length < 2) return true;
 
+				pad.layer.change(data[d.layer]);				
 				pad.setStyle(data[d.color], data[d.width]);
 				window.lastData = data;
 
@@ -328,13 +349,13 @@
 					cN = data[d.axis][i];
 					draw({x: cP[0], y: cP[1]}, {x: cN[0], y: cN[1]});
 				}			
+				history.save();
 			},
 			draw: function (cStart, cNow){
 				if(pad.position.compare(cStart, cNow)){
-					cNow.x++;
-					cNow.y++;
+					cNow.x++; cNow.y++;
 				}
-				context = pad.up.context;
+				context = pad.write.context;
 				context.beginPath();
 				context.lineJoin = 'round';
 				context.lineCap = 'round';
@@ -369,8 +390,9 @@
 				else $("#flowzone").hide();
 			},
 			eventStart: function(){
-				console.log("Start Active!");
+				console.log("Start Active!")
 				this.data.drawState = true;
+
 				pos = $.extend({}, mouse.pos);
 				historyEventAxis = new Array();
 				historyEventAxis.push(pad.position.getInt(pos));
@@ -378,7 +400,7 @@
 				
 				pad.setStyle(style.color, style.width);
 				history.timeCount();
-				this.eventAdd();
+				//this.eventAdd();
 			},
 			eventAdd: function(){				
 				pos = $.extend({}, mouse.pos);
@@ -402,6 +424,7 @@
 				if(this.data.drawState){
 					this.data.drawState = false;
 				}else return false;
+				
 				console.log("Stop Active!");
 				if(e === undefined)
 					this.eventAdd();
@@ -415,11 +438,12 @@
 			},
 			eventSave: function(){
 				historyEvent.push({
-					0: style.draw,
-					1: style.width,
-					2: style.color,
-					3: historyAllStep - historyEventAxis.length,
-					4: historyEventAxis
+					modes.define.drawType: style.draw,
+					modes.define.width: style.width,
+					modes.define.color: style.color,
+					modes.define.time: historyAllStep - historyEventAxis.length,
+					modes.define.axis: historyEventAxis,
+					modes.define.layer: style.layer
 				});
 			},
 			data: {
@@ -440,8 +464,8 @@
 			width: 1,
 			color: 2,
 			time: 3,
-			axis: 4
-			
+			axis: 4,
+			layer: 5
 		}
 	}
 
@@ -454,7 +478,7 @@
 			mouseClicked = false;
 		},
 		move: function (e){
-			off = pad.down.$.offset();
+			off = pad.write.$.offset();
 			
 			mouse.pos.x = e.pageX - off.left;
 			mouse.pos.y = e.pageY - off.top;
