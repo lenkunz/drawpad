@@ -3,351 +3,12 @@
 <head>
 <title>test</title>
 <script src="jquery.min.js"></script>
-<script>
-(function(){
-	var mouseClicked = false,
-		mouseIn = false,
-		historyPad = new Array(),
-		historyEvent = new Array(),
-		historyEventAxis = new Array(),
-		historyStep = 0,
-		historyAllStep = 0,
-		historyMinStep = 0,
-		lastX = 0, lastY = 0,
-		lastMouseClickedState = false,
-		lastMouseInState = false;
-
-	var mouse = {
-		pos : {x: 0, y: 0}
-	};
-		
-	var	settings = {
-		TIME_DELAY : 25,
-		CANVAS_WIDTH  : 854,
-		CANVAS_HEIGHT : 480,
-		CANVAS_EVENTOFFSET : 30,
-		HISTORY_LIMIT : 100
-	};
-	
-	var style = {
-		color : '#000',
-		width : 2,
-		draw : 'line'
-	};
-
-	window.saveE = historyEvent;
-	
-	$(document).ready(function (){
-		pad.init($("#drawpad"));
-		
-		$(document).mousemove(mouseEvent.move);
-		$(window).mousedown(mouseEvent.down);
-		$(window).mouseup(mouseEvent.up);
-		
-		$(document).keypress(callKeyFunction);
-		$(".replay").click(history.replay);
-		pad.clear();
-		
-		startPadListener();
-	});
-	
-	// Pad listener
-	// Main interval to record all events
-	function startPadListener(){
-		setInterval(function(){
-			if(history.data.replayState) return false;
-			modes[style.draw].eventTrigger();
-		}, settings.TIME_DELAY);
-	}
-	
-	function callKeyFunction(e){
-		if(mouseIn){
-			key = String.fromCharCode(e.keyCode).toLowerCase();
-			if(key == 'z'){
-				history.undo();
-			}else if(key == 'x'){
-				history.redo();
-			}
-		}
-	}
-		
-	var pad = {
-		$ : false,
-		element: false,
-		context: false,
-		setStyle: function(color, width){
-			this.context.strokeStyle = color;
-			this.context.lineWidth = width;
-		},
-		init: function(jque){
-			this.$ = jque;
-			this.element = jque[0];
-			this.context = this.element.getContext('2d');
-		},
-		clear: function(){
-			this.context.clearRect(0, 0, settings.CANVAS_WIDTH, settings.CANVAS_HEIGHT);
-		},
-	};
-		
-	var history = pad.history = {
-	/* key funciton */
-		undo : function (){
-			if(historyStep > 0 && (historyPad[historyStep - 2] != undefined || historyStep == 1)){
-				pad.context.clearRect(0, 0, settings.CANVAS_WIDTH, settings.CANVAS_HEIGHT);
-				img = new Image();
-				img.src = historyPad[--historyStep - 1];
-				img.onload = function(){ pad.context.drawImage(img, 0, 0) };
-			}
-		},
-		redo : function (){
-			if(history.haveRedo()){
-				pad.element.width = pad.element.width;
-				img = new Image();
-				img.src = historyPad[historyStep++];
-				img.onload = function(){ pad.context.drawImage(img, 0, 0) };
-			}
-		},
-		clearRedo : function(){
-			historyPad.length = historyStep;
-			historyEvent.length = historyStep;
-		},
-		clearRedoPad : function(step){
-			historyPad.length = step;
-		},
-		haveRedo : function(){
-			return historyStep < historyPad.length;
-		},
-		haveUndo : function(){
-			return historyStep > 0 && historyStep >= historyMinStep;
-		},
-		count : function(){
-			historyStep++;
-		},
-		timeCount : function(){
-			historyAllStep++;
-		},
-		save : function(){
-			if(history.haveRedo())
-				history.clearRedo();
-			
-			// Save only settings.HISTORY_LIMIT historys for undo
-			if(historyPad.length >= settings.HISTORY_LIMIT){
-				historyPad[historyPad.length - settings.HISTORY_LIMIT] = undefined;
-				historyMinStep = historyPad.length - settings.HISTORY_LIMIT;
-			}
-			
-			historyPad.push(pad.element.toDataURL());
-		},
-		replay : function(){
-			if(history.data.replayState) return false;
-			history.data.replayState = true;
-			pad.clear();
-			timeIndex = 0;
-			eventIndex = 0;
-			endLength = historyEvent.length;
-			history.clearRedoPad(0);
-			function timeout(){
-				while(historyEvent[eventIndex].t == timeIndex){
-					modes[historyEvent[eventIndex].d]
-						.play(historyEvent[eventIndex]);
-					eventIndex++;
-					if(eventIndex >= endLength){
-						history.data.replayLastState = true;
-						return true;
-					}
-				}
-				setTimeout(timeout, settings.TIME_DELAY);
-				console.log(timeIndex);
-				timeIndex++;
-			};
-			timeout();
-		},
-		data : {
-			replayState: false,
-			replayLastState: false
-		},
-		replayResetState : function(){
-			if(history.data.replayLastState){
-				history.data.replayLastState = false;
-				history.data.replayState = false;
-			}
-		},
-		getSize : function(){
-			return JSON.stringify(historyEvent).length;
-		}
-	};
-						
-	var modes = pad.modes = {
-		line : {
-			dataCheck: function(data){
-				if(data === undefined || data.d === undefined || data.d != 'line' || data.a === undefined || 
-					data.w === undefined || data.c === undefined || data.t === undefined) return false;
-					
-				return true;
-			},
-			play: function(data){
-				if(!this.dataCheck(data)) return false;
-				if(data.a.length < 2) return true;
-				pad.setStyle(data.c, data.w);
-				window.lastData = data;
-					
-				iNow = 1;
-				dataLength = data.a.length;
-				dThis = this;
-
-				interval = setInterval(function(){
-					cP = data.a[iNow - 1];
-					cN = data.a[iNow];
-					dThis.draw({x: cP[0], y: cP[1]}, {x: cN[0], y: cN[1]});
-					iNow++;
-					if(iNow >= dataLength - 1){
-						clearTimeout(interval);
-						history.save();
-						history.replayResetState();
-					}
-				}, settings.TIME_DELAY);
-			},
-			instantPlay: function(data){
-				if(!this.dataCheck(data)) return false;
-				for(i = 1; i < dataLength; i++){
-					cP = data.a[i - 1];
-					cN = data.a[i];
-					draw(cP, cN, data.c, data.w, context);
-				}			
-			},
-			draw: function (cStart, cNow){
-				context = pad.context;
-				
-				context.beginPath();
-				context.moveTo(cStart.x, cStart.y);
-				context.lineTo(cNow.x  , cNow.y  );
-				context.closePath();
-				context.stroke();
-			},
-			eventTrigger: function(e){
-				// If click state change
-				if(lastMouseClickedState != mouseClicked){
-					if(mouseIn){
-						if(mouseClicked) this.eventStart();
-						else this.eventStop();
-					}
-				}else if(mouseClicked && mouseIn){
-					if(lastMouseInState != mouseIn){
-						if(mouseIn) this.eventStart();
-						else this.eventStop();
-					}
-					else if(this.data.drawState) this.eventAdd();
-				}else if(!mouseIn){
-					this.eventStop();
-				}
-				lastMouseClickedState = mouseClicked;
-				lastMouseInState = mouseIn;
-			},
-			eventStart: function(){
-				console.log("Start Active!");
-				this.data.drawState = true;
-				pos = $.extend({}, mouse.pos);
-				historyEventAxis = new Array();
-				historyEventAxis.push([pos[0], pos[1]]);
-				this.data.lastMouse = pos;
-				
-				pad.setStyle(style.color, style.width);
-				history.timeCount();
-				this.eventAdd();
-			},
-			eventAdd: function(){				
-				pos = $.extend({}, mouse.pos);
-				if( pos.x == this.data.lastMouse.x &&
-					pos.y == this.data.lastMouse.y ) return false;
-
-				// Add to Pad
-				this.draw(this.data.lastMouse, pos);
-				
-				// Add to historyObject
-				historyEventAxis.push([pos.x, pos.y]);
-				
-				this.data.lastMouse = pos;
-				history.timeCount();
-			},
-			eventStop: function(e){
-				if(this.data.drawState){
-					this.data.drawState = false;
-				}else return false;
-				console.log("Stop Active!");
-				if(e === undefined)
-					this.eventAdd();
-
-				history.save();
-				this.eventSave();
-				history.count();
-				$("#value_jsize").html((history.getSize() / 1024).toFixed(2) + " KB");
-			},
-			eventSave: function(){
-				historyEvent.push({
-					d : style.draw,
-					w : style.width,
-					c : style.color,
-					t : historyAllStep - historyEventAxis.length,
-					a : historyEventAxis
-				});
-			},
-			data: {
-				lastMouse: {x: 0, y: 0},
-				drawState: false
-			}
-		}
-	}
-
-	// Event
-	var mouseEvent = pad.mouseEvent = {
-		down: function (){
-			mouseClicked = true;
-			$("#value_down")[0].innerHTML = mouseClicked;
-		},	
-		up: function (){
-			mouseClicked = false;
-			$("#value_down")[0].innerHTML = mouseClicked;
-		},
-		move: function (e){
-			off = pad.$.offset();
-			
-			mouse.pos.x = e.pageX - off.left;
-			mouse.pos.y = e.pageY - off.top;
-			$("#value_x").html(mouse.pos.x);
-			$("#value_y").html(mouse.pos.y);
-			
-			mouseEvent.overcheck();
-		},
-		overcheck: function (){
-			if( mouse.pos.x >= -settings.CANVAS_EVENTOFFSET &&
-				mouse.pos.x <= settings.CANVAS_WIDTH + settings.CANVAS_EVENTOFFSET &&
-				mouse.pos.y >= -settings.CANVAS_EVENTOFFSET &&
-				mouse.pos.y <= settings.CANVAS_HEIGHT + settings.CANVAS_EVENTOFFSET )
-				mouseIn = true;
-			else
-				mouseIn = false;
-				
-			$("#value_in")[0].innerHTML = mouseIn;
-		}
-	}
-	
-	// Cursor
-	var cursor = pad.cursor = {
-		trigger: function(){
-			if(mouseIn){
-			
-			}else{
-			
-			}
-		}
-	}
-
-})();
-</script>
+<script src="msgpack.js"></script>
+<script src="drawpad.js"></script>
 <style>
 #wrap {
 	position: relative;
-	width: 854px;
+	width: 800px;
 	height: 525px;
 	border: 1px solid #000;
 
@@ -371,9 +32,9 @@
 	user-select: none;
 }
 
-#panel-left {
+#panel-top {
 	position: absolute;
-	width: 854px;
+	width: 800px;
 	height: 45px;
 	background: #EEE;
 	top: 0;
@@ -381,7 +42,17 @@
 	border-bottom: 1px solid #000;
 }
 
-#drawpad, #cursor-overlay {
+#panel-top {
+	position: absolute;
+	width: 800px;
+	height: 45px;
+	background: #EEE;
+	top: 0;
+	left: 0;
+	border-bottom: 1px solid #000;
+}
+
+#drawpad, #drawpadup, #cursor-overlay {
 	position: absolute;
 	top: 45px;
 	left: 0px;
@@ -389,7 +60,7 @@
 }
 
 #cursor-overlay {
-	width: 854px;
+	width: 800px;
 	height: 480px;
 	overflow: hidden;
 }
@@ -397,21 +68,44 @@
 #cursor-draw {
 	position: absolute;
 }
+
+#flowzone {
+	background: rgba(255, 0, 0, 0.1);
+	position: absolute;
+	top: -55px;
+	left: -100px;
+	width: 1000px;
+	height: 680px;
+	border-radius: 10px;
+}
+
+#bgzone {
+	background: #FFF;
+	position: absolute;
+	top: 45px;
+	left: 0;
+	width: 800px;
+	height: 480px;
+}
 </style>
 </head>
 <body class="unselectable">
 <div id="wrap" style="">
-	<div class="panel" id="panel-left"></div>
-	<canvas id="drawpad" width="854" height="480"></canvas>
+	<div class="panel" id="panel-top"></div>
+	<div id="flowzone"></div>
+	<div id="bgzone"></div>
+	<canvas id="drawpad" width="800" height="480"></canvas>
+	<canvas id="drawpadup" width="800" height="480"></canvas>
 	<div id="cursor-overlay">
 		<canvas id="cursor-draw" width="854px" height="480px"></canvas>
 	</div>
-	<div class="panel" id="panel-left">
+	<div class="panel" id="panel-right">
 	
 	</div>
 </div>
 <div id="value_indicator">
 	JSON Size = <span id="value_jsize">0 KB</span><br />
+	MSGPack Size = <span id="value_msize">0 KB</span><br />
 	<a class="replay">Replay</a>
 </div>
 </body>
