@@ -8,9 +8,8 @@
 <style>
 #wrap {
 	position: relative;
-	width: 800px;
+	width: 900px;
 	height: 525px;
-	border: 1px solid #000;
 
 }
 
@@ -34,29 +33,35 @@
 
 #panel-top {
 	position: absolute;
-	width: 800px;
-	height: 45px;
-	background: #EEE;
 	top: 0;
 	left: 0;
-	border-bottom: 1px solid #000;
+	width: 951px;
+	height: 44px;
+	border: 1px solid #000;
+	border-bottom: 1px solid #CCC;
+	background: #EEE;
 }
 
-#panel-top {
+#panel-right {
 	position: absolute;
-	width: 800px;
-	height: 45px;
+	top: 45px;
+	left: 801px;
+	width: 150px;
+	height: 480px;
+	border: 1px solid #000;
+	border-top: 0;
+	border-left: 1px solid #CCC;
 	background: #EEE;
-	top: 0;
-	left: 0;
-	border-bottom: 1px solid #000;
 }
 
-.drawpad, #drawpadup, #cursor-overlay {
+.drawpad, .drawpad-write, #cursor-overlay {
 	position: absolute;
 	top: 45px;
 	left: 0px;
 	cursor: default;
+	border: 1px solid #000;
+	border-top: 0;
+	border-right: 0;
 }
 
 #cursor-overlay {
@@ -87,22 +92,84 @@
 	width: 800px;
 	height: 480px;
 }
+
+#newlayer {
+	margin: 2px 5px;
+	background: #FAFAFA;
+	width: 71px;
+	height: 30px;
+	line-height: 30px;
+	border-radius: 3px;
+	text-align: center;
+	cursor: pointer;
+}
+
+.example {
+	display: none;
+}
+
+.pad-layers {
+	margin: 5px 0px;
+	padding: 0px 3px;
+	width: 144px;
+	height: 95px;
+	background: #E2E2E2;
+	border-radius: 2px;
+}
+
+.pad-layers.selected {
+	background: #CCC;
+}
+
+.pad-layers .preview {
+	width: 107px;
+	height: 64px;
+	margin: 1px;
+	border: 1px solid #555;
+	cursor: pointer;
+	background: #FFF;
+}
+
+.pad-layers .preview canvas{
+	width: 107px;
+	height: 64px;	
+}
+
+.pad-layers .name {
+	padding: 2px;
+	padding-bottom: 1px;
+	width: 105px;
+	text-align: center;
+}
+
 </style>
 </head>
 <body class="unselectable">
 <div id="wrap" style="">
+	<!-- Tools !-->
 	<div class="panel" id="panel-top"></div>
+	<!-- Layer !-->
+	<div class="panel" id="panel-right">
+		<div id="layer-panel">
+			<div class="pane-newlayer" id="newlayer">New</div>
+		</div>
+		<div id="layer-container">
+			<div class="pad-layers example">
+				<div class="name">Test</div>
+				<div class="preview"></div>
+			</div>
+		</div>
+	</div>
 
 	<div id="flowzone"></div>
 	<div id="bgzone"></div>
 
 	<div id="drawpad-layers"></div>
-	<canvas id="drawpadup" width="800" height="480" style="z-index: 100"></canvas>
+	<div id="drawpad-writer"></div>
 
 	<div id="cursor-overlay">
-		<canvas id="cursor-draw" width="854px" height="480px"></canvas>
+		<canvas id="cursor-draw" width="800px" height="480px"></canvas>
 	</div>
-	<div class="panel" id="panel-right"></div>
 </div>
 <div id="value_indicator">
 	JSON Size = <span id="value_jsize">0 KB</span><br />
